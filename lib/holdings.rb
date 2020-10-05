@@ -4,11 +4,16 @@ require "json"
 module Holdings
   class Error < StandardError; end
 
+  NO_CLASSIFICATIONS_ERROR = "No classifications, make sure to download the data from the Allocations tab!"
+
   def self.run!
     h = App.new; h.load("holdings.json")
     h.table.each do |row|
       puts row.join("\t")
     end
+  rescue Holdings::Error => e
+    STDERR.puts e
+    exit(1)
   end
 
   class App
@@ -22,13 +27,24 @@ module Holdings
     # There is only one top level classification:
     # irb(main):011:0> h.classifications[0]["classificationTypeName"]
     # => "allocationSevenBox"
+    #
+    # Note, if the holdings data is downloaded without visting the
+    # "Allocations" tab, then the classifications list will be empty.
     def classifications
-      @data["spData"]["classifications"].first["classifications"]
+      classifications = @data["spData"]["classifications"]
+      if not classifications
+        raise Holdings::Error, NO_CLASSIFICATIONS_ERROR
+      end
+      classifications.first["classifications"]
     end
 
     # Returns the single classification entrypoint of type "allocationSevenBox"
     def classification
-      Classification.new(@data["spData"]["classifications"].first)
+      classifications = @data["spData"]["classifications"]
+      if classifications.empty?
+        raise Holdings::Error, NO_CLASSIFICATIONS_ERROR
+      end
+      Classification.new(classifications.first)
     end
 
     def table
